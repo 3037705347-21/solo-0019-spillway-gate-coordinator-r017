@@ -12,15 +12,43 @@ func formatTime(value time.Time) string {
 }
 
 func gateView(gate domain.Gate) contracts.GateView {
-	return contracts.GateView{
+	eligibility := gate.ClearanceEligibility()
+	view := contracts.GateView{
 		ID:              gate.ID,
 		Name:            gate.Name,
 		Status:          string(gate.Status),
 		Aperture:        gate.Aperture,
 		MaxAperture:     gate.MaxAperture,
 		ActiveCommandID: gate.ActiveCommandID,
-		UpdatedAt:       formatTime(gate.UpdatedAt),
-		Version:         gate.Version,
+		ClearanceEligibility: contracts.ClearanceEligibilityView{
+			Eligible:         eligibility.Eligible,
+			FaultEstablished: eligibility.FaultEstablished,
+			HasOccupancy:     eligibility.HasOccupancy,
+			Reasons:          eligibility.Reasons,
+		},
+		UpdatedAt: formatTime(gate.UpdatedAt),
+		Version:   gate.Version,
+	}
+	if gate.Fault != nil {
+		view.Fault = &contracts.FaultRecordView{
+			CommandID:  gate.Fault.CommandID,
+			Reason:     gate.Fault.Reason,
+			Aperture:   gate.Fault.Aperture,
+			OccurredAt: formatTime(gate.Fault.OccurredAt),
+		}
+	}
+	if gate.LastClearance != nil {
+		view.LastClearance = clearanceEvidenceView(*gate.LastClearance)
+	}
+	return view
+}
+
+func clearanceEvidenceView(evidence domain.ClearanceEvidence) *contracts.ClearanceEvidenceView {
+	return &contracts.ClearanceEvidenceView{
+		HandledBy: evidence.HandledBy,
+		Reference: evidence.Reference,
+		Note:      evidence.Note,
+		ClearedAt: formatTime(evidence.ClearedAt),
 	}
 }
 

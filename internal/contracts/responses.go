@@ -12,15 +12,39 @@ type InterlockDecisionView struct {
 	ReviewedAt string `json:"reviewed_at"`
 }
 
+type FaultRecordView struct {
+	CommandID  string  `json:"command_id"`
+	Reason     string  `json:"reason"`
+	Aperture   float64 `json:"aperture"`
+	OccurredAt string  `json:"occurred_at"`
+}
+
+type ClearanceEvidenceView struct {
+	HandledBy string `json:"handled_by"`
+	Reference string `json:"reference"`
+	Note      string `json:"note,omitempty"`
+	ClearedAt string `json:"cleared_at"`
+}
+
+type ClearanceEligibilityView struct {
+	Eligible         bool     `json:"eligible"`
+	FaultEstablished bool     `json:"fault_established"`
+	HasOccupancy     bool     `json:"has_occupancy"`
+	Reasons          []string `json:"reasons"`
+}
+
 type GateView struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	Status          string  `json:"status"`
-	Aperture        float64 `json:"aperture"`
-	MaxAperture     float64 `json:"max_aperture"`
-	ActiveCommandID string  `json:"active_command_id,omitempty"`
-	UpdatedAt       string  `json:"updated_at"`
-	Version         int64   `json:"version"`
+	ID                   string                   `json:"id"`
+	Name                 string                   `json:"name"`
+	Status               string                   `json:"status"`
+	Aperture             float64                  `json:"aperture"`
+	MaxAperture          float64                  `json:"max_aperture"`
+	ActiveCommandID      string                   `json:"active_command_id,omitempty"`
+	Fault                *FaultRecordView         `json:"fault,omitempty"`
+	LastClearance        *ClearanceEvidenceView   `json:"last_clearance,omitempty"`
+	ClearanceEligibility ClearanceEligibilityView `json:"clearance_eligibility"`
+	UpdatedAt            string                   `json:"updated_at"`
+	Version              int64                    `json:"version"`
 }
 
 type CommandView struct {
@@ -60,4 +84,9 @@ type ReviewCommandResponse struct {
 type ExecuteCommandResponse struct {
 	Command CommandView `json:"command"`
 	Gate    GateView    `json:"gate"`
+}
+
+type ClearGateFaultResponse struct {
+	Gate      GateView              `json:"gate"`
+	Clearance ClearanceEvidenceView `json:"clearance"`
 }

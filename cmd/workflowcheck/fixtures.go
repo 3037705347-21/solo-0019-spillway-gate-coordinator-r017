@@ -79,3 +79,50 @@ func fixtureClearReview(
 	}
 	return command, nil
 }
+
+// fixtureFaultedGate drives a command through review and a fault-simulating
+// execution so the target gate ends latched in faulted status with the
+// command aborted. It returns the faulted gate and the aborted command.
+func fixtureFaultedGate(
+	client *apiClient,
+	gateID string,
+	targetAperture float64,
+) (map[string]any, map[string]any, error) {
+	command, err := fixtureCommand(client, gateID, targetAperture, "故障演练", "dispatcher-lin")
+	if err != nil {
+		return nil, nil, err
+	}
+	commandID, err := stringField(command, "id")
+	if err != nil {
+		return nil, nil, err
+	}
+	approved, err := fixtureClearReview(client, commandID, "safety-wu")
+	if err != nil {
+		return nil, nil, err
+	}
+	token, err := stringField(approved, "execution_token")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	faulted, err := client.post("/commands/"+commandID+"/execute", map[string]any{
+		"operator":       "operator-chen",
+		"token":          token,
+		"simulate_fault": true,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := requireStatus(faulted, http.StatusOK, "execute command with simulated fault"); err != nil {
+		return nil, nil, err
+	}
+	gate, err := objectField(faulted.Body, "gate")
+	if err != nil {
+		return nil, nil, err
+	}
+	abortedCommand, err := objectField(faulted.Body, "command")
+	if err != nil {
+		return nil, nil, err
+	}
+	return gate, abortedCommand, nil
+}

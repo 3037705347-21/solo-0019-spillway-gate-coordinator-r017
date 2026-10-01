@@ -20,6 +20,7 @@ POST /commands
 GET  /commands/{id}
 POST /commands/{id}/interlock
 POST /commands/{id}/execute
+POST /gates/{id}/clearance
 ```
 
 登记闸门示例：
@@ -64,6 +65,18 @@ POST /commands/{id}/execute
 }
 ```
 
+故障清除示例（闸门因执行故障进入 faulted 后，由授权运维员提交处置依据）：
+
+```json
+{
+  "handled_by": "maintainer-lu",
+  "reference": "WO-20260930-17",
+  "note": "现场更换开度传感器并复核限位"
+}
+```
+
+`GET /gates/{id}` 始终返回 `clearance_eligibility`（eligible、fault_established、has_occupancy、reasons），用于查看闸门是否具备解除条件。授权运维名单内置为 `maintainer-lu`、`maintainer-zheng`、`maintainer-chen`，可用环境变量 `GATE_MAINTAINERS`（逗号分隔）覆盖。清除成功后闸门恢复 idle 且保留故障时开度，故障记录与处置证据继续留档。
+
 ## 目录
 
 - `cmd/server`：服务进程。
@@ -82,6 +95,7 @@ go run ./cmd/workflowcheck --workflow register-gate
 go run ./cmd/workflowcheck --workflow request-gate-command
 go run ./cmd/workflowcheck --workflow review-safety-interlock
 go run ./cmd/workflowcheck --workflow execute-gate-command
+go run ./cmd/workflowcheck --workflow clear-gate-fault
 ```
 
 这些检查会创建临时 HTTP 服务并调用真实路由。它们不调用外部网络，也不依赖数据库。

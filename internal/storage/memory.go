@@ -40,7 +40,7 @@ func (m *MemoryRepository) Gate(_ context.Context, id string) (domain.Gate, erro
 	if !exists {
 		return domain.Gate{}, domain.NotFound("gate_not_found", "gate id was not found")
 	}
-	return gate, nil
+	return cloneGate(gate), nil
 }
 
 func (m *MemoryRepository) CreateCommand(_ context.Context, command domain.GateCommand) error {
@@ -103,7 +103,7 @@ func (m *MemoryRepository) ReviewCommand(
 		return domain.GateCommand{}, domain.Gate{}, err
 	}
 
-	nextGate := gate
+	nextGate := cloneGate(gate)
 	if decision.IsClear() {
 		if err := nextGate.Reserve(nextCommand.ID, now); err != nil {
 			return domain.GateCommand{}, domain.Gate{}, err
@@ -112,7 +112,7 @@ func (m *MemoryRepository) ReviewCommand(
 
 	m.commands[nextCommand.ID] = nextCommand
 	m.gates[nextGate.ID] = nextGate
-	return cloneCommand(nextCommand), nextGate, nil
+	return cloneCommand(nextCommand), cloneGate(nextGate), nil
 }
 
 func (m *MemoryRepository) ExecuteCommand(
@@ -140,20 +140,20 @@ func (m *MemoryRepository) ExecuteCommand(
 		return domain.GateCommand{}, domain.Gate{}, err
 	}
 
-	nextGate := gate
+	nextGate := cloneGate(gate)
 	if err := nextGate.StartMovement(nextCommand.ID, now); err != nil {
 		return domain.GateCommand{}, domain.Gate{}, err
 	}
 
 	if simulateFault {
-		if err := nextGate.Settle(nextCommand.TargetAperture, true, now); err != nil {
-			return domain.GateCommand{}, domain.Gate{}, err
-		}
 		if err := nextCommand.Abort("simulated_gate_fault", now); err != nil {
 			return domain.GateCommand{}, domain.Gate{}, err
 		}
+		if err := nextGate.LatchFault(nextCommand.ID, nextCommand.TerminalReason, nextCommand.TargetAperture, now); err != nil {
+			return domain.GateCommand{}, domain.Gate{}, err
+		}
 	} else {
-		if err := nextGate.Settle(nextCommand.TargetAperture, false, now); err != nil {
+		if err := nextGate.Settle(nextCommand.TargetAperture, now); err != nil {
 			return domain.GateCommand{}, domain.Gate{}, err
 		}
 		if err := nextCommand.Complete(now); err != nil {
@@ -163,7 +163,80 @@ func (m *MemoryRepository) ExecuteCommand(
 
 	m.commands[nextCommand.ID] = nextCommand
 	m.gates[nextGate.ID] = nextGate
-	return cloneCommand(nextCommand), nextGate, nil
+	return cloneCommand(nextCommand), cloneGate(nextGate), nil
+}
+
+func (m *MemoryRepository) ClearGateFault(
+	_ context.Context,
+	gateID string,
+	evidence domain.ClearanceEvidence,
+) (domain.Gate, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	gate, exists := m.gates[gateID]
+	if !exists {
+		return domain.Gate{}, domain.NotFound("gate_not_found", "gate id was not found")
+	}
+
+	// The fault fact must be backed by a stored command that is terminally
+	// aborted; re-verifying it inside the lock prevents clearing a gate whose
+	// fault record does not correspond to a real finished failure, and
+	// guarantees no approved/executing command still occupies the gate.
+	if gate.Status == domain.GateFaulted {
+		if gate.Fault == nil {
+			return domain.Gate{}, domain.Conflict("fault_fact_missing", "fault fact is not established")
+		}
+		faultCommand, exists := m.commands[gate.Fault.CommandID]
+		if !exists {
+			return domain.Gate{}, domain.Conflict("fault_fact_missing", "fault command was not found")
+		}
+		if faultCommand.Status != domain.CommandAborted {
+			return domain.Gate{}, domain.Conflict("fault_not_settled", "fault command has not terminated as aborted")
+		}
+		for _, command := range m.commands {
+			if command.GateID != gateID {
+				continue
+			}
+			if command.Status == domain.CommandApproved || command.Status == domain.CommandExecuting {
+				return domain.Gate{}, domain.Conflict("gate_occupied", "an unfinished command still occupies the gate")
+			}
+		}
+	}
+
+	nextGate := cloneGate(gate)
+	if err := nextGate.ClearFault(evidence); err != nil {
+		return domain.Gate{}, err
+	}
+
+	m.gates[nextGate.ID] = nextGate
+	return cloneGate(nextGate), nil
+}
+
+// GateClearanceStatus returns the gate under a single read lock so that the
+// clearance eligibility report and the gate snapshot come from one
+// consistent read; callers never have to stitch multiple reads together.
+func (m *MemoryRepository) GateClearanceStatus(_ context.Context, gateID string) (domain.Gate, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	gate, exists := m.gates[gateID]
+	if !exists {
+		return domain.Gate{}, domain.NotFound("gate_not_found", "gate id was not found")
+	}
+	return cloneGate(gate), nil
+}
+
+func cloneGate(gate domain.Gate) domain.Gate {
+	if gate.Fault != nil {
+		fault := *gate.Fault
+		gate.Fault = &fault
+	}
+	if gate.LastClearance != nil {
+		evidence := *gate.LastClearance
+		gate.LastClearance = &evidence
+	}
+	return gate
 }
 
 func cloneCommand(command domain.GateCommand) domain.GateCommand {

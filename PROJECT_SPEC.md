@@ -9,6 +9,7 @@
 - 运行协调员：登记闸门并提交开度调整命令。
 - 安全复核员：提交联锁结论，决定命令是否通过。
 - 闸门操作员：凭执行令牌启动命令并登记执行结果。
+- 闸门运维员：现场处置故障后，凭运维身份和处置依据申请解除故障锁存。
 
 ## 核心实体
 
@@ -34,6 +35,10 @@
 
 闸门操作员通过 `POST /commands/{id}/execute` 提交执行令牌。服务校验命令、令牌、闸门占用关系和目标开度，在临界区内完成 approved、executing、completed 或 aborted 的转换，并同步更新闸门状态。令牌在命令结束后失效，不能复用。
 
+### clear-gate-fault
+
+闸门运维员通过 `POST /gates/{id}/clearance` 提交本次现场处置依据（处置人、处置依据编号、备注）。服务先校验处置依据完整性和处置人授权，再在仓库临界区内复核：闸门必须处于 faulted、故障事实记录存在且其命令已终态 aborted、不存在任何 approved/executing 占用命令。条件全部满足时原子地把闸门从 faulted 恢复为 idle，开度保持故障保留值，版本号加一，并留档处置证据；任一条件不满足都返回稳定错误且不改变任何状态。运维员可随时通过 `GET /gates/{id}` 的 `clearance_eligibility` 看到闸门当前是否具备解除条件及具体原因。
+
 ## 状态与规则
 
 - `gate` 状态：idle、reserved、moving、faulted。
@@ -44,6 +49,10 @@
 - blocked 复核使命令 rejected，不会占用闸门。
 - 模拟故障会令命令 aborted、闸门 faulted，并保留最终开度。
 - 已完成或已中止的命令不能再次执行。
+- faulted 闸门不能接收新命令，必须通过正式清除流程才能恢复 idle。
+- faulted -> idle 是唯一解除路径，且是有守卫转换：故障事实存在、故障命令已 aborted、无未结束占用，缺一不可。
+- 故障清除只能由授权运维员提交处置依据后执行；证据缺失返回 invalid，越权返回 forbidden，重复/并发清除或对非故障闸门清除返回 conflict。
+- 清除成功后命令（aborted 终态）、闸门（idle 与保留开度）和后续新命令（起始开度取保留值）必须互相解释。
 
 ## 模块边界
 
@@ -64,6 +73,7 @@
 - `GET /commands/{id}`
 - `POST /commands/{id}/interlock`
 - `POST /commands/{id}/execute`
+- `POST /gates/{id}/clearance`
 
 错误响应统一为：
 

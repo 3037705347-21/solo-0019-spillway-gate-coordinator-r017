@@ -124,6 +124,27 @@
         "storage",
         "contracts"
       ]
+    },
+    {
+      "id": "clear-gate-fault",
+      "name": "Clear gate fault",
+      "entry": "POST /gates/{id}/clearance",
+      "steps": [
+        "validate the handling basis and authorize the maintainer",
+        "re-verify the fault fact and absence of unfinished occupancy under the repository lock",
+        "apply the guarded faulted -> idle transition while retaining aperture and recording the evidence"
+      ],
+      "success": "returns an idle gate at the retained aperture plus the recorded clearance evidence",
+      "failure": "missing evidence is invalid, an unauthorized operator is forbidden, and duplicate, concurrent, or bypass clearances conflict without changing state",
+      "verification": "workflowcheck latches a fault, inspects clearance eligibility, clears exactly once under concurrency, rejects every bypass, and proves a new command reads the retained aperture",
+      "module_ids": [
+        "entrypoint",
+        "httpapi",
+        "coordination",
+        "domain",
+        "storage",
+        "contracts"
+      ]
     }
   ],
   "complexity": {

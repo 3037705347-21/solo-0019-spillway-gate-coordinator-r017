@@ -25,3 +25,9 @@ type ExecuteCommandRequest struct {
 	Token         string `json:"token"`
 	SimulateFault bool   `json:"simulate_fault"`
 }
+
+type ClearGateFaultRequest struct {
+	HandledBy string `json:"handled_by"`
+	Reference string `json:"reference"`
+	Note      string `json:"note"`
+}
