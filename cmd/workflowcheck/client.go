@@ -127,6 +127,28 @@ func floatField(object map[string]any, name string) (float64, error) {
 	return number, nil
 }
 
+func errorCode(result apiResult) (string, error) {
+	code, ok := result.Body["code"].(string)
+	if !ok {
+		return "", fmt.Errorf("response is missing a string error code: %s", prettyBody(result.Body))
+	}
+	return code, nil
+}
+
+func requireErrorCode(result apiResult, expectedStatus int, expectedCode, operation string) error {
+	if err := requireStatus(result, expectedStatus, operation); err != nil {
+		return err
+	}
+	code, err := errorCode(result)
+	if err != nil {
+		return fmt.Errorf("%s: %w", operation, err)
+	}
+	if code != expectedCode {
+		return fmt.Errorf("%s: expected error code %q, got %q", operation, expectedCode, code)
+	}
+	return nil
+}
+
 func prettyBody(body map[string]any) string {
 	encoded, err := json.Marshal(body)
 	if err != nil {

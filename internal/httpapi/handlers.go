@@ -109,3 +109,26 @@ func (h *handler) executeCommand(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 }
+
+func (h *handler) clearGateFault(w http.ResponseWriter, r *http.Request) {
+	var request contracts.ClearGateFaultRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	command, gate, clearance, err := h.service.ClearGateFault(r.Context(), r.PathValue("id"), request)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(
+		w,
+		http.StatusOK,
+		contracts.ClearGateFaultResponse{
+			Gate:      gateView(gate),
+			Clearance: clearanceView(clearance),
+			Command:   commandView(command, false),
+		},
+	)
+}

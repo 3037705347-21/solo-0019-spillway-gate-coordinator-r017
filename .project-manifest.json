@@ -124,6 +124,28 @@
         "storage",
         "contracts"
       ]
+    },
+    {
+      "id": "clear-gate-fault",
+      "name": "Clear latched gate fault",
+      "entry": "POST /gates/{id}/clearance",
+      "steps": [
+        "validate the maintainer identity and the handling basis evidence",
+        "verify the explicit fault fact: latched gate, matching aborted command and terminal reason",
+        "scan for any non-terminal command still occupying the gate",
+        "commit the faulted to idle transition and the clearance record atomically"
+      ],
+      "success": "returns an idle gate retaining the final aperture, the clearance record and the aborted command, then accepts new commands",
+      "failure": "returns 400 for insufficient evidence, 403 for unauthorized identities, 409 for duplicate/concurrent clears, mismatched fault facts or open commands; nothing changes state",
+      "verification": "workflowcheck drives a gate faulted, proves every guarded failure branch leaves it latched, runs concurrent clears with a single winner, and confirms a fresh command flows after clearance",
+      "module_ids": [
+        "entrypoint",
+        "httpapi",
+        "coordination",
+        "domain",
+        "storage",
+        "contracts"
+      ]
     }
   ],
   "complexity": {
@@ -133,6 +155,6 @@
       "resource_lifetime",
       "error_propagation"
     ],
-    "notes": "Gate reservation and command transitions are committed under one repository lock; execution tokens are single-command resources and become invalid after a terminal transition."
+    "notes": "Gate reservation and command transitions are committed under one repository lock; execution tokens are single-command resources and become invalid after a terminal transition. Fault clearance is a guarded faulted -> idle transition validated against an explicit fault record and an aborted command, with non-terminal occupation scans and single-winner concurrent clears under the same repository lock."
   }
 }

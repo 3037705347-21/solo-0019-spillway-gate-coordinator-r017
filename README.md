@@ -20,6 +20,7 @@ POST /commands
 GET  /commands/{id}
 POST /commands/{id}/interlock
 POST /commands/{id}/execute
+POST /gates/{id}/clearance
 ```
 
 登记闸门示例：
@@ -64,10 +65,27 @@ POST /commands/{id}/execute
 }
 ```
 
+执行故障会把闸门锁存为 `faulted`。只有授权运维人员（`ops-` 前缀身份）提交处置依据、引用锁存的故障命令，且闸门没有未结束命令时，才能解除锁存：
+
+```
+POST /gates/gate-east/clearance
+```
+
+```json
+{
+  "command_id": "故障执行对应的已中止命令 id",
+  "handler": "ops-qin",
+  "evidence": "现场人工盘车复核，液压与机械限位恢复正常，已重新挂接安全销",
+  "note": "处置完成申请恢复"
+}
+```
+
+解除成功返回恢复为 `idle` 的闸门（保留最终开度，附带 `fault` 与 `last_clearance` 审计票据）、清除记录和对应的 aborted 命令；依据不足返回 400，非授权身份返回 403，重复/并发清除、引用错误故障或仍有未结束命令返回 409，且均不改变状态。
+
 ## 目录
 
 - `cmd/server`：服务进程。
-- `cmd/workflowcheck`：四条工作流的真实 HTTP 检查入口。
+- `cmd/workflowcheck`：五条工作流的真实 HTTP 检查入口。
 - `internal/bootstrap`：依赖装配。
 - `internal/contracts`：公开数据契约。
 - `internal/coordination`：业务工作流。
@@ -82,6 +100,7 @@ go run ./cmd/workflowcheck --workflow register-gate
 go run ./cmd/workflowcheck --workflow request-gate-command
 go run ./cmd/workflowcheck --workflow review-safety-interlock
 go run ./cmd/workflowcheck --workflow execute-gate-command
+go run ./cmd/workflowcheck --workflow clear-gate-fault
 ```
 
 这些检查会创建临时 HTTP 服务并调用真实路由。它们不调用外部网络，也不依赖数据库。

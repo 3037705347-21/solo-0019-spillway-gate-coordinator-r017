@@ -12,7 +12,7 @@ func formatTime(value time.Time) string {
 }
 
 func gateView(gate domain.Gate) contracts.GateView {
-	return contracts.GateView{
+	view := contracts.GateView{
 		ID:              gate.ID,
 		Name:            gate.Name,
 		Status:          string(gate.Status),
@@ -21,6 +21,34 @@ func gateView(gate domain.Gate) contracts.GateView {
 		ActiveCommandID: gate.ActiveCommandID,
 		UpdatedAt:       formatTime(gate.UpdatedAt),
 		Version:         gate.Version,
+	}
+	if gate.Fault != nil {
+		view.Fault = &contracts.FaultRecordView{
+			CommandID:  gate.Fault.CommandID,
+			Reason:     gate.Fault.Reason,
+			Aperture:   gate.Fault.Aperture,
+			OccurredAt: formatTime(gate.Fault.OccurredAt),
+		}
+	}
+	if gate.LastClearance != nil {
+		view.LastClearance = &contracts.FaultClearanceView{
+			FaultCommandID: gate.LastClearance.FaultCommandID,
+			Handler:        gate.LastClearance.Handler,
+			Evidence:       gate.LastClearance.Evidence,
+			Note:           gate.LastClearance.Note,
+			ClearedAt:      formatTime(gate.LastClearance.ClearedAt),
+		}
+	}
+	return view
+}
+
+func clearanceView(clearance domain.ClearanceRecord) contracts.FaultClearanceView {
+	return contracts.FaultClearanceView{
+		FaultCommandID: clearance.FaultCommandID,
+		Handler:        clearance.Handler,
+		Evidence:       clearance.Evidence,
+		Note:           clearance.Note,
+		ClearedAt:      formatTime(clearance.ClearedAt),
 	}
 }
 

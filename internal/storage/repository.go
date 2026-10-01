@@ -27,4 +27,10 @@ type Repository interface {
 		simulateFault bool,
 		now time.Time,
 	) (domain.GateCommand, domain.Gate, error)
+	ClearGateFault(
+		ctx context.Context,
+		gateID string,
+		clearance domain.ClearanceRecord,
+		now time.Time,
+	) (domain.GateCommand, domain.Gate, error)
 }

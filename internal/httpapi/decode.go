@@ -42,6 +42,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		status = http.StatusNotFound
 	case domain.KindConflict:
 		status = http.StatusConflict
+	case domain.KindForbidden:
+		status = http.StatusForbidden
 	}
 
 	response := contracts.ErrorResponse{

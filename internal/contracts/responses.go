@@ -13,14 +13,31 @@ type InterlockDecisionView struct {
 }
 
 type GateView struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	Status          string  `json:"status"`
-	Aperture        float64 `json:"aperture"`
-	MaxAperture     float64 `json:"max_aperture"`
-	ActiveCommandID string  `json:"active_command_id,omitempty"`
-	UpdatedAt       string  `json:"updated_at"`
-	Version         int64   `json:"version"`
+	ID              string              `json:"id"`
+	Name            string              `json:"name"`
+	Status          string              `json:"status"`
+	Aperture        float64             `json:"aperture"`
+	MaxAperture     float64             `json:"max_aperture"`
+	ActiveCommandID string              `json:"active_command_id,omitempty"`
+	Fault           *FaultRecordView    `json:"fault,omitempty"`
+	LastClearance   *FaultClearanceView `json:"last_clearance,omitempty"`
+	UpdatedAt       string              `json:"updated_at"`
+	Version         int64               `json:"version"`
+}
+
+type FaultRecordView struct {
+	CommandID  string  `json:"command_id"`
+	Reason     string  `json:"reason"`
+	Aperture   float64 `json:"aperture"`
+	OccurredAt string  `json:"occurred_at"`
+}
+
+type FaultClearanceView struct {
+	FaultCommandID string `json:"fault_command_id"`
+	Handler        string `json:"handler"`
+	Evidence       string `json:"evidence"`
+	Note           string `json:"note,omitempty"`
+	ClearedAt      string `json:"cleared_at"`
 }
 
 type CommandView struct {
@@ -60,4 +77,10 @@ type ReviewCommandResponse struct {
 type ExecuteCommandResponse struct {
 	Command CommandView `json:"command"`
 	Gate    GateView    `json:"gate"`
+}
+
+type ClearGateFaultResponse struct {
+	Gate      GateView           `json:"gate"`
+	Clearance FaultClearanceView `json:"clearance"`
+	Command   CommandView        `json:"command"`
 }

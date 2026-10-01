@@ -79,3 +79,48 @@ func fixtureClearReview(
 	}
 	return command, nil
 }
+
+// fixtureFaultedGate registers a gate, submits and clears a command, then
+// executes it with simulate_fault so the gate is latched faulted. It returns
+// the faulting command id, the faulted gate view and the target aperture.
+func fixtureFaultedGate(
+	client *apiClient,
+	gateID string,
+	targetAperture float64,
+) (string, map[string]any, float64, error) {
+	if _, err := fixtureGate(client, gateID, gateID+"-name", 5, 0.25); err != nil {
+		return "", nil, 0, err
+	}
+	command, err := fixtureCommand(client, gateID, targetAperture, "故障处置流程验证", "dispatcher-lin")
+	if err != nil {
+		return "", nil, 0, err
+	}
+	commandID, err := stringField(command, "id")
+	if err != nil {
+		return "", nil, 0, err
+	}
+	approved, err := fixtureClearReview(client, commandID, "safety-wu")
+	if err != nil {
+		return "", nil, 0, err
+	}
+	token, err := stringField(approved, "execution_token")
+	if err != nil {
+		return "", nil, 0, err
+	}
+	faulted, err := client.post("/commands/"+commandID+"/execute", map[string]any{
+		"operator":       "operator-chen",
+		"token":          token,
+		"simulate_fault": true,
+	})
+	if err != nil {
+		return "", nil, 0, err
+	}
+	if err := requireStatus(faulted, http.StatusOK, "simulate execution fault"); err != nil {
+		return "", nil, 0, err
+	}
+	gate, err := objectField(faulted.Body, "gate")
+	if err != nil {
+		return "", nil, 0, err
+	}
+	return commandID, gate, targetAperture, nil
+}
